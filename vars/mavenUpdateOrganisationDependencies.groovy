@@ -15,9 +15,7 @@ def call(body) {
     body()
 
     def organisation = config.organisation
-    def repoNames = config.repos
     def pomLocation = 'pom.xml'
-    def containerName = config.containerName ?: 'clients'
 
     def flow = new Fabric8Commands()
 
@@ -30,15 +28,9 @@ def call(body) {
     if (replaceVersions.size() > 0) {
         println "Now updating all projects within organisation: ${organisation}"
 
-        def repos;
-        if (repoNames?.trim()) {
-            repos = repoNames.split(',')
-        } else {
-            repos = getRepos(organisation)
-        }
+        def repos = getRepos(organisation)
 
         for (repo in repos) {
-            repo = repo.toString().trim()
             def project = "${organisation}/${repo}"
 
             // lets check if the repo has a pom.xml
@@ -46,7 +38,7 @@ def call(body) {
             def hasPom = false
             try {
                 hasPom = !pomUrl.text.isEmpty()
-            } catch (FileNotFoundException e1) {
+            } catch( FileNotFoundException e1 ) {
                 // ignore
 
             }
@@ -77,20 +69,22 @@ def call(body) {
 
                     //sh "cat ${repo}/${pomLocation}"
 
-                    container(name: containerName) {
-                        flow.setupGitSSH()
+                    container(name: 'clients') {
 
+                        sh 'chmod 600 /root/.ssh-git/ssh-key'
+                        sh 'chmod 600 /root/.ssh-git/ssh-key.pub'
+                        sh 'chmod 700 /root/.ssh-git'
+
+                        sh "git config --global user.email fabric8-admin@googlegroups.com"
+                        sh "git config --global user.name fabric8-release"
+
+                        def githubToken = flow.getGitHubToken()
                         def message = "\"Update pom property versions\""
                         sh "cd ${repo} && git add ${pomLocation}"
                         sh "cd ${repo} && git commit -m ${message}"
                         sh "cd ${repo} && git push origin versionUpdate${uid}"
                         retry(5) {
-                            String ghToken = readFile '/home/jenkins/.apitoken/hub'
-                            wrap([$class: 'MaskPasswordsBuildWrapper', varPasswordPairs: [
-                                    [password: ghToken, var: 'GH_PASSWORD']]]) {
-
-                                sh "export GITHUB_TOKEN=${ghToken} && cd ${repo} && hub pull-request -m ${message} > pr.txt"
-                            }
+                            sh "export GITHUB_TOKEN=${githubToken} && cd ${repo} && hub pull-request -m ${message} > pr.txt"
                         }
                     }
                     pr = readFile("${repo}/pr.txt")
@@ -99,7 +93,7 @@ def call(body) {
                     println "received Pull Request Id: ${id}"
                     flow.addMergeCommentToPullRequest(id, project)
 
-                    waitUntilPullRequestMerged {
+                    waitUntilPullRequestMerged{
                         name = project
                         prId = id
                     }
@@ -110,7 +104,7 @@ def call(body) {
         }
     }
 
-}
+  }
 
 @NonCPS
 def loadPomPropertyVersions(String xml, replaceVersions) {
@@ -140,7 +134,7 @@ def loadPomPropertyVersions(String xml, replaceVersions) {
 }
 
 @NonCPS
-def getRepos(String organisation) {
+def getRepos(String organisation){
     repoApi = new URL("https://api.github.com/orgs/${organisation}/repos?per_page=100")
     repos = new JsonSlurper().parse(repoApi.newReader())
 

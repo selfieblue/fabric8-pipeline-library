@@ -28,7 +28,7 @@ def call(body) {
     }
 }
 
-def dockerBuild(version) {
+def dockerBuild(version){
     def utils = new Utils()
     def flow = new Fabric8Commands()
     def namespace = utils.getNamespace()
@@ -42,43 +42,37 @@ def dockerBuild(version) {
     }
 }
 
-def s2iBuild(version) {
+def s2iBuild(version){
 
-    def utils = new Utils()
-    def ns = utils.namespace
-    def resourceName = utils.getResourceName()
-    def is = getImageStream(ns, resourceName)
-    def bc = getBuildConfig(ns, resourceName, version)
+    def is = getImageStream()
+    def bc = getBuildConfig(version)
 
-    sh "oc delete is ${resourceName} -n ${ns} || true"
-    kubernetesApply(file: is, environment: ns)
-    kubernetesApply(file: bc, environment: ns)
-    sh "oc start-build ${resourceName}-s2i --from-dir ./ --follow -n ${ns}"
+    kubernetesApply(file: is, environment: 'default')
+    kubernetesApply(file: bc, environment: 'default')
+    sh "oc start-build ${env.JOB_NAME}-s2i --from-dir ../${env.JOB_NAME} --follow"
 
 }
 
-def getImageStream(ns, resourceName) {
+def getImageStream(){
     return """
 apiVersion: v1
 kind: ImageStream
 metadata:
-  name: ${resourceName}
-  namespace: ${ns}
+  name: ${env.JOB_NAME}
 """
 }
 
-def getBuildConfig(ns, resourceName, version) {
+def getBuildConfig(version){
     return """
 apiVersion: v1
 kind: BuildConfig
 metadata:
-  name: ${resourceName}-s2i
-  namespace: ${ns}
+  name: ${env.JOB_NAME}-s2i
 spec:
   output:
     to:
       kind: ImageStreamTag
-      name: ${resourceName}:${version}
+      name: ${env.JOB_NAME}:${version}
   runPolicy: Serial
   source:
     type: Binary

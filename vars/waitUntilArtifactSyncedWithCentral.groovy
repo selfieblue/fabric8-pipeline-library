@@ -10,12 +10,12 @@ def call(body) {
     def flow = new io.fabric8.Fabric8Commands()
 
     waitUntil {
-        retry(3) {
+        retry(3){
             flow.isArtifactAvailableInRepo(config.repo, config.groupId.replaceAll('\\.', '/'), config.artifactId, config.version, config.ext)
         }
     }
 
     message = "${config.artifactId} ${config.version} released and available in maven central"
-    hubotSend message: message, failOnError: false
+    hubot room: 'release', message: message
 
 }

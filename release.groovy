@@ -9,7 +9,6 @@ def tagDownstreamRepos() {
     newVersion = getJenkinsVersion()
     container(name: 'clients') {
 
-        println "Pushing Pipeline Library tag ${newVersion}"
         flow.pushTag(newVersion)
 
     }
@@ -26,7 +25,6 @@ def tagDownstreamRepos() {
 
         sh "git commit -a -m 'Updated Jenkinsfiles with new library version ${newVersion}'"
 
-        println "Pushing Jenkinsfile Library tag ${newVersion}"
         flow.pushTag(newVersion)
     }
 
@@ -40,9 +38,11 @@ def getJenkinsVersion() {
 
 def setWorkspace(String project) {
     sh "git remote set-url origin git@github.com:${project}.git"
-
-    def flow = new Fabric8Commands()
-    flow.setupGitSSH()
+    sh "git config user.email fabric8-admin@googlegroups.com"
+    sh "git config user.name fabric8-release"
+    sh 'chmod 600 /root/.ssh-git/ssh-key'
+    sh 'chmod 600 /root/.ssh-git/ssh-key.pub'
+    sh 'chmod 700 /root/.ssh-git'
 }
 
 return this
